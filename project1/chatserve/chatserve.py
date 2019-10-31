@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 
 #########################################################################
-# CS372 Winter 2019 - Project 1 - Server
+# CS372 Intro to Networks
+# Winter 2019
+#
+# Project 1 - Server (chatserve)
 # David Mednikov
-# Last Modified: 10/29/2019 1:55pm
+# Last Modified: 10/30/2019 3:30pm
 #
 # This project is a simple chat system with two users - a server
 # and a client. The server listens to a port that is passed as a
@@ -27,7 +30,10 @@ from termios import tcflush, TCIOFLUSH
 def openSocket(portNumber):
     """
     Opens a socket at the provided port number and listens for an incoming connection
-    Params: portNumber on which server should open socket
+    Params:
+        portNumber on which server should open socket
+    Returns:
+        opened chatSocket
     Pre-conditions: Socket at specified port must not be in use
     Post-conditions: Server is listening for connections at specified port
     """
@@ -50,7 +56,9 @@ def openSocket(portNumber):
 def closeSocket(chatSocket, portNumber):
     """
     Closes a socket at the provided port number
-    Params: portNumber on which server should open socket
+    Params:
+        chatSocket (that is currently active)
+        portNumber (for printing)
     Pre-conditions: Socket must have an active connection at specified port
     Post-conditions: Socket at specified port will not have an active connection
     """
@@ -62,7 +70,9 @@ def closeSocket(chatSocket, portNumber):
 def sendMessage(chatSocket, message):
     """
     Sends a message to the provided socket
-    Params: active socket connection, message to send to client
+    Params:
+        active socket connection
+        message to send to client
     Pre-conditions: Socket must have an active connection at specified port
     Post-conditions: Message will be sent to client at specified socket
     """
@@ -73,7 +83,10 @@ def sendMessage(chatSocket, message):
 def receiveMessage(chatSocket):
     """
     Receives a message from the provided socket
-    Params: active socket connection
+    Params:
+        active socket connection
+    Returns:
+        message received from client
     Pre-conditions: Socket must have a pending message to be read by the server.
                     If no message, program should halt until one comes in.
     Post-conditions: Message will be read by the server
@@ -85,12 +98,17 @@ def receiveMessage(chatSocket):
 def getInput(query):
     """
     Accepts input from the user
-    Params: query to show the user when requesting input
+    Params:
+        query to show the user when requesting input
+    Returns:
+        input from user
     Pre-conditions: stdin should be empty
-    Post-conditions: user's input will be accepted by the pgoram
+    Post-conditions: user input will be accepted by the program
     """
     # flush stdin so that any text entered out of turn is ignored
+    # excerpted from https://stackoverflow.com/questions/2520893/how-to-flush-the-input-stream-in-python)
     tcflush(sys.stdin, TCIOFLUSH)
+
     # show user query, get input, and return
     return input(query)
 
@@ -123,7 +141,7 @@ while True:
             # query user for input
             userInput = getInput('chatserve> ')
 
-            # if not '\quit', send message to client
+            # if input is not '\quit', send message to client
             if userInput != r'\quit':
                 sendMessage(connectionSocket, "chatserve> " + userInput)
             else:
