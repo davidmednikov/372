@@ -231,7 +231,7 @@ int receiveMessage(char* buffer, int socketStream) {
     }
 
     // if buffer not equal to '\quit', server has not closed connection
-    if (strcmp(buffer, "\\quit") != 0) {
+    if (strcmp(buffer, "\\quit") != 0 && strcmp(buffer, "") != 0) {
         // print contents of buffer
         printf("%s\n", buffer);
 
