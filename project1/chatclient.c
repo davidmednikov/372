@@ -23,8 +23,8 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <stdio.h>
-#include <stdio_ext.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -145,6 +145,43 @@ char* getName() {
 
 
 /*************************************************************************
+* function flushStdin
+* Flushes any buffered data from stdin. This fixes a bug caused by the
+* client sending messages out-of-turn.
+* Pre-conditions: None
+* Post-conditions: stdin will be emptied
+*************************************************************************/
+void flushStdin() {
+    /*
+        This code adapted from https://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
+    */
+
+    // set up struct data for poll() function
+    struct pollfd fds[1];
+
+    // poll stdin (represented by 0)
+    fds[0].fd = 0;
+    // poll any data (represented by POLLRDNORM)
+    fds[0].events = POLLRDNORM;
+
+    // poll stdin and store to result
+    int result = poll(fds, 1, 0);
+
+    // if result not 0, data needs to be flushed from stdin
+    while(result != 0) {
+        // create temporary variable to flush stdin into
+        char trash[1000];
+
+        // get data from stdin and store to trash
+        fgets(trash, 1000, stdin);
+
+        // poll new result to see if more data needs to be cleared
+        result = poll(fds, 1, 0);
+    }
+}
+
+
+/*************************************************************************
 * function getInput
 * Gets input from user and stores to char* inputString param
 * Params:
@@ -156,12 +193,14 @@ char* getName() {
 * Post-conditions: Client gets user input and passes back to main function
 *************************************************************************/
 void getInput(char* username, char* inputString) {
+    // flush stdin so that bad data is not sent to server
+    flushStdin();
+
     // print username and query user for input
     printf("%s> ", username);
 
     // clear inputString and stdin
     memset(inputString, '\0', 512);
-    __fpurge(stdin);
 
     // get input from user and store to inputString
     fgets(inputString, 512, stdin);
