@@ -111,7 +111,9 @@ char* getName() {
         fgets(username, 20, stdin);
 
         // if input is 11 chars or less (including newline), check for spaces
-        if (strlen(username) <= 11) {
+        if (strlen(username) == 1) {
+            printf("Username may not be empty.\n");
+        } else if (strlen(username) <= 11) {
             // strip newline character from username
             username[strlen(username) - 1] = '\0';
 
