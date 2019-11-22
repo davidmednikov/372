@@ -25,6 +25,7 @@
 # Much of this code has been adapted from the socket programming lecture:
 # https://oregonstate.instructure.com/courses/1771948/files/76024149/download?wrap=1
 
+import os
 import sys
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from termios import tcflush, TCIOFLUSH
@@ -194,7 +195,7 @@ def validate_inputs(arguments):
     return None
 
 
-def save_file(file):
+def save_file(filename, lines):
     """
     Sends a file to the provided server
     Params:
@@ -203,6 +204,27 @@ def save_file(file):
     Pre-conditions: Client must have an active connection to server
     Post-conditions: File will be sent to server
     """
+    counter = 0
+    if not os.path.isfile('./' + filename):
+        new_file = open(filename, 'w')
+        for line in lines:
+            new_file.write(line + '\n')
+        new_file.close()
+        return filename
+    else:
+        test_name = filename
+        while os.path.isfile('./' + test_name):
+            counter += 1
+            if filename.endswith(".txt"):
+                name = filename[:-4]
+                test_name = name + '_' + str(counter) + ".txt"
+            else:
+                test_name = filename + '_' + str(counter)
+        new_file = open(test_name, 'w')
+        for line in lines:
+            new_file.write(line + '\n')
+        new_file.close()
+        return test_name
 
 
 def print_directory(directory_list, request):
@@ -252,8 +274,8 @@ if (request != None):
         elif lines[0] == 'get':
             print("Receiving \"{}\" from {}:{}".format(request['file'], request['hostname'], request['data_port']))
             lines.pop(0)
-            save_file(lines)
-            print(lines)
+            save_name = save_file(request['file'], lines)
+            print("File transfer complete. File saved as {}".format(save_name))
 
     else:
         print("{}:{} says\n{}".format(request['hostname'], request['port'], is_valid_command))

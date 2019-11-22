@@ -134,10 +134,6 @@ int send_data(char* message, char* buffer, cmd cmd, int socket) {
 
     // send buffer to socket
     int charsWritten = send(socket, buffer, strlen(buffer), 0);
-    if (charsWritten < 0) {
-        // error writing to socket
-        printf("chatclient: ERROR sending to socket\n");
-    }
 
     // clear buffer after sending
     memset(buffer, '\0', 10000);
@@ -159,11 +155,14 @@ bool open_file(FILE* file, char* filename, char* save_string) {
     memset(save_string, '\0', 10000);
     file = fopen(filename, "r");
     if (file != NULL) {
-        fgets(save_string, 1000, file);
-        while(fgets(save_string, 1000, file)) {
-            char temp[1000];
-            memset(temp, '\0', 1000);
+        char temp[1000];
+        fgets(temp, 1000, file);
+        strncpy(save_string, temp, strlen(temp));
+        memset(temp, '\0', 1000);
+        while(fgets(temp, 1000, file)) {
+            strncpy(temp, temp, strlen(temp));
             strcat(save_string, temp);
+            memset(temp, '\0', 1000);
         }
         return true;
     }
@@ -214,7 +213,7 @@ int main(int argc, char* argv[]) {
                     send(new_fd, "OK", 3, 0);
                     data_fd = open_data_port(&client_host[0], &data_port[0], data_hints, data_res);
                     printf("Sending \"%s\" to %s:%s\n\n", filename, client_name, data_port);
-                    send_file(read_file, buffer, data_fd);
+                    send_file(&read_file[0], buffer, data_fd);
                     close(data_fd);
                 } else {
                     memset(print_message, '\0', 500);
