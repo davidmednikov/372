@@ -30,7 +30,7 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from termios import tcflush, TCIOFLUSH
 from urllib.parse import urlparse
 
-def open_socket():
+def open_client_socket():
     """
     Opens a socket
     Params:
@@ -45,7 +45,7 @@ def open_socket():
     return new_socket
 
 
-def connect_to_socket(open_socket, socket_host, socket_port):
+def connect_client_socket(open_socket, socket_host, socket_port):
     """
     Connects to the socket at the provided socket
     Params:
@@ -59,6 +59,34 @@ def connect_to_socket(open_socket, socket_host, socket_port):
     return open_socket
 
 
+def open_data_socket():
+    """
+    Opens a socket at the provided port number and listens for incoming data
+    Params:
+        data_port on which server should open socket
+    Returns:
+        opened data_port
+    Pre-conditions: Socket at specified port must not be in use
+    Post-conditions: Server is listening for connections at specified port
+    """
+    # create socket, set family and type
+    data_socket = socket(AF_INET, SOCK_STREAM)
+
+    # set socket options to allow re-using the port. Excerpted from:
+    # https://docs.python.org/3/library/socket.html
+    data_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
+    return data_socket
+
+
+def listen_data_socket(data_socket, data_port):
+     # bind to the specified port number and listen for 1 incoming connection
+    data_socket.bind(('', data_port))
+    data_socket.listen(1)
+
+    return data_socket
+
+
 def close_connection(open_socket):
     """
     Closes the connection to the socket
@@ -67,12 +95,10 @@ def close_connection(open_socket):
     Pre-conditions: Client must be connected to socket
     Post-conditions: Connection closed and client terminated. I'll be back.
     """
-    # print update to terminal and close socket
-    print(f"ftclient: Closing connection to {open_socket}")
     open_socket.close()
 
 
-def send_command(open_socket, command):
+def send_command(open_socket, request):
     """
     Sends a command to the server
     Params:
@@ -82,6 +108,10 @@ def send_command(open_socket, command):
     Post-conditions: Command will be sent to server
     """
     # encode message from string to bytes and send to client
+    if (request['file'] != None):
+        command = "{} {} {}".format(request['command'], request['file'], request['data_port'])
+    else:
+        command = "{} {}".format(request['command'], request['data_port'])
     open_socket.send(command.encode('utf-8'))
 
 
@@ -96,7 +126,7 @@ def receive_data(open_socket):
     Post-conditions: Client will receive output from server
     """
     # read message from socket and decode from bytes to string
-    return open_socket.recv(1024).decode('utf-8')
+    return open_socket.recv(10000).decode('utf-8')
 
 
 def invalid_input(error, bad_input = None):
@@ -112,16 +142,16 @@ def invalid_input(error, bad_input = None):
     print(f"ftclient: ERROR - INVALID INPUT")
     if error == 'arguments':
         print(f"Accepted inputs:")
-        print("list: ./ftclient <SERVER_URL> <SERVER_PORT> -l <DATA_PORT>")
-        print("get: ./ftclient <SERVER_URL> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
-    elif error == 'url':
-        print(f"{bad_input} is not a valid URL.")
+        print("list: ./ftclient <SERVER_HOST> <SERVER_PORT> -l <DATA_PORT>")
+        print("get: ./ftclient <SERVER_HOST> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
+    elif error == 'hostname':
+        print(f"{bad_input} is not a valid host. Must be one of 'flip1', 'flip2', or 'flip3'.")
     elif error == 'port':
         print(f"{bad_input} is not a valid port number. Must be between 0 and 65535.")
     else:
         print(f"Correct usage:")
-        print("list: ./ftclient <SERVER_URL> <SERVER_PORT> -l <DATA_PORT>")
-        print("get: ./ftclient <SERVER_URL> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
+        print("list: ./ftclient <SERVER_HOST> <SERVER_PORT> -l <DATA_PORT>")
+        print("get: ./ftclient <SERVER_HOST> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
 
 
 def check_arguments(arguments):
@@ -145,17 +175,20 @@ def validate_inputs(arguments):
         file = None
         data_port = int(arguments[4])
 
-    if port < 0 or port > 65535:
+    if hostname != 'flip1' and hostname != 'flip2' and hostname != 'flip3':
+        invalid_input('hostname', hostname)
+    elif port < 1 or port > 65535:
         invalid_input('port', port)
-    elif data_port < 0 or data_port > 65535:
+    elif data_port < 1 or data_port > 65535:
         invalid_input('port', data_port)
     else:
         request = {}
-        request['hostname'] = hostname
-        request['port'] = port
+        request['data_port'] = data_port
         request['command'] = command
         request['file'] = file
-        request['data_port'] = data_port
+        request['hostname'] = hostname
+        request['port'] = port
+        request['url'] = hostname + '.engr.oregonstate.edu'
         return request
 
     return None
@@ -172,7 +205,7 @@ def save_file(file):
     """
 
 
-def print_directory(directory):
+def print_directory(directory_list, request):
     """
     Gets the directory from the server
     Params:
@@ -182,16 +215,47 @@ def print_directory(directory):
     Pre-conditions: Connection to server and -l flag passed at runtime
     Post-conditions: Displays list of files from server
     """
+    print("Receiving directory substructure from {}:{}".format(request['hostname'], request['data_port']))
+    #https://stackoverflow.com/questions/10269701/case-insensitive-list-sorting-without-lowercasing-the-result
+    directory_list = sorted(directory_list, key=str.casefold)
+    for line in directory_list:
+        print(line)
 
-request_object = check_arguments(sys.argv)
+request = check_arguments(sys.argv)
 
-if (request_object != None):
+if (request != None):
     # open socket and listen on the specified port
-    client_socket = open_socket()
+    client_socket = open_client_socket()
 
     # accept an incoming connection at the socket and set connected flag to true
-    client_socket = connect_to_socket(client_socket, request_object['hostname'], request_object['port'])
+    client_socket = connect_client_socket(client_socket, request['url'], request['port'])
 
-    send_command(client_socket, "test")
+    send_command(client_socket, request)
+
+    is_valid_command = receive_data(client_socket).strip()
+
+    if is_valid_command == "OK\0":
+
+        data_socket = open_data_socket()
+
+        data_socket = listen_data_socket(data_socket, request['data_port'])
+
+        connected_socket, address = data_socket.accept()
+
+        response = receive_data(connected_socket)
+
+        lines = response.split('\n')
+
+        if lines[0] == 'list':
+            lines.pop(0)
+            print_directory(lines, request)
+        elif lines[0] == 'get':
+            print("Receiving \"{}\" from {}:{}".format(request['file'], request['hostname'], request['data_port']))
+            lines.pop(0)
+            save_file(lines)
+            print(lines)
+
+    else:
+        print("{}:{} says\n{}".format(request['hostname'], request['port'], is_valid_command))
 
     close_connection(client_socket)
