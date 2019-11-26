@@ -116,7 +116,7 @@ def send_command(open_socket, request):
     open_socket.send(command.encode('utf-8'))
 
 
-def receive_data(open_socket):
+def receive_data(open_socket, is_response = False):
     """
     Receives data from the open socket
     Params:
@@ -127,7 +127,18 @@ def receive_data(open_socket):
     Post-conditions: Client will receive output from server
     """
     # read message from socket and decode from bytes to string
-    return open_socket.recv(10000).decode('utf-8')
+    if (is_response):
+        return open_socket.recv(1024).decode('utf-8')
+    data = None
+    while True:
+        if data is None:
+            data = open_socket.recv(1024).decode('utf-8')
+        else:
+            segment = open_socket.recv(1024).decode('utf-8')
+            data += segment
+            if len(segment) == 0:
+                break
+    return data
 
 
 def invalid_input(error, bad_input = None):
@@ -140,17 +151,17 @@ def invalid_input(error, bad_input = None):
     Pre-conditions: User entered invalid runtime arguments
     Post-conditions: Error message printed to terminal
     """
-    print(f"ftclient: ERROR - INVALID INPUT")
+    print("ftclient: ERROR - INVALID INPUT")
     if error == 'arguments':
-        print(f"Accepted inputs:")
+        print("Accepted inputs:")
         print("list: ./ftclient <SERVER_HOST> <SERVER_PORT> -l <DATA_PORT>")
         print("get: ./ftclient <SERVER_HOST> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
     elif error == 'hostname':
         print(f"{bad_input} is not a valid host. Must be one of 'flip1', 'flip2', or 'flip3'.")
     elif error == 'port':
-        print(f"{bad_input} is not a valid port number. Must be between 0 and 65535.")
+        print(f"{bad_input} is not a valid port number. Must be between 1025 and 65535.")
     else:
-        print(f"Correct usage:")
+        print("Correct usage:")
         print("list: ./ftclient <SERVER_HOST> <SERVER_PORT> -l <DATA_PORT>")
         print("get: ./ftclient <SERVER_HOST> <SERVER_PORT> -g <FILENAME> <DATA_PORT>")
 
@@ -178,9 +189,9 @@ def validate_inputs(arguments):
 
     if hostname != 'flip1' and hostname != 'flip2' and hostname != 'flip3':
         invalid_input('hostname', hostname)
-    elif port < 1 or port > 65535:
+    elif port <= 1024 or port > 65535:
         invalid_input('port', port)
-    elif data_port < 1 or data_port > 65535:
+    elif data_port <= 1024 or data_port > 65535:
         invalid_input('port', data_port)
     else:
         request = {}
@@ -254,7 +265,7 @@ if (request != None):
 
     send_command(client_socket, request)
 
-    is_valid_command = receive_data(client_socket).strip()
+    is_valid_command = receive_data(client_socket, True).strip()
 
     if is_valid_command == "OK\0":
 
@@ -264,7 +275,7 @@ if (request != None):
 
         connected_socket, address = data_socket.accept()
 
-        response = receive_data(connected_socket)
+        response = receive_data(connected_socket, False)
 
         lines = response.split('\n')
 
@@ -275,7 +286,9 @@ if (request != None):
             print("Receiving \"{}\" from {}:{}".format(request['file'], request['hostname'], request['data_port']))
             lines.pop(0)
             save_name = save_file(request['file'], lines)
-            print("File transfer complete. File saved as {}".format(save_name))
+            print("File transfer complete. File saved as {}.".format(save_name))
+
+        close_connection(data_socket)
 
     else:
         print("{}:{} says\n{}".format(request['hostname'], request['port'], is_valid_command))

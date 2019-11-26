@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 typedef enum { false, true } bool;
@@ -56,18 +57,18 @@ int accept_client_connection(int socket_fd, struct sockaddr_storage client_addre
                     sizeof (char[100]), service, sizeof (char[10]), 0);
     strncpy(client_name, client_host, 6);
     client_name[5] = '\0';
-    printf("Connection from %s:%s.\n", client_name, service);
+    printf("Connection from %s.\n", client_name);
     return new_fd;
 }
 
 cmd get_command(int new_fd, char* buffer, char* command, char* filename, char* data_port) {
     int bytes_sent, spaces, string_length;
 
+    memset(buffer, '\0', 1000);
     memset(command, '\0', 10);
     memset(filename, '\0', 100);
     memset(data_port, '\0', 10);
 
-    memset(buffer, '\0', 10000);
     bytes_sent = recv(new_fd, buffer, 1000, 0);
     if (bytes_sent != 0) {
         string_length = strlen(buffer);
@@ -128,15 +129,14 @@ int get_directory(char* dir_string) {
 }
 
 int send_data(char* message, char* buffer, cmd cmd, int socket) {
-    // clear out buffer array and set to username + message
-    memset(buffer, '\0', 10000);
+    // set buffer to username + message
     sprintf(buffer, "%s\n%s", cmd == list ? "list" : "get", message);
 
     // send buffer to socket
     int charsWritten = send(socket, buffer, strlen(buffer), 0);
 
     // clear buffer after sending
-    memset(buffer, '\0', 10000);
+    memset(buffer, '\0', strlen(buffer));
     return charsWritten;
 }
 
@@ -144,25 +144,35 @@ int send_data(char* message, char* buffer, cmd cmd, int socket) {
 int send_list(char* buffer, int data_fd) {
     char directory[1000];
     get_directory(&directory[0]);
-    return send_data(&directory[0], buffer, list, data_fd);
+    // clear out buffer
+    memset(buffer, '\0', 1000);
+    int return_value = send_data(&directory[0], buffer, list, data_fd);
+    // clear buffer after sending
+    memset(buffer, '\0', 1000);
+    return return_value;
 }
 
-int send_file(char* file, char* buffer, int data_fd) {
-    return send_data(file, buffer, get, data_fd);
+int send_file(char* file, char* buffer, int data_fd, size_t file_size) {
+    // clear out buffer after sending
+    memset(buffer, '\0', file_size + 11);
+    int return_value = send_data(file, buffer, get, data_fd);
+    // clear out buffer
+    memset(buffer, '\0', file_size + 11);
+    return return_value;
 }
 
-bool open_file(FILE* file, char* filename, char* save_string) {
-    memset(save_string, '\0', 10000);
+bool open_file(FILE* file, char* filename, char* save_string, size_t file_size) {
+    memset(save_string, '\0', file_size + 11);
     file = fopen(filename, "r");
     if (file != NULL) {
-        char temp[1000];
-        fgets(temp, 1000, file);
+        char temp[10000];
+        fgets(temp, 9999, file);
         strncpy(save_string, temp, strlen(temp));
-        memset(temp, '\0', 1000);
-        while(fgets(temp, 1000, file)) {
+        memset(temp, '\0', 10000);
+        while(fgets(temp, 9999, file)) {
             strncpy(temp, temp, strlen(temp));
             strcat(save_string, temp);
-            memset(temp, '\0', 1000);
+            memset(temp, '\0', 10000);
         }
         return true;
     }
@@ -177,57 +187,67 @@ int send_error(int client_fd, char* print_message, char* send_message) {
 int main(int argc, char* argv[]) {
     bool keep_open = true;
     cmd cmd;
-    char buffer[10000], read_file[10000], port[10], print_message[500];
+    char port[10], print_message[500], text_buffer[1000];
+    char *file_buffer, *read_file;
     char client_host[100], client_name[10], command[10], filename[100], data_port[10], service[10];
 
     FILE* requested_file = NULL;
 
-    int data_fd, new_fd, socket_fd;
+    int data_fd, new_fd, port_number, socket_fd;
     socklen_t address_size;
     struct addrinfo data_hints, listen_hints, *data_res = NULL, *listen_res = NULL;
     struct sockaddr_storage client_address;
+    struct stat stat_struct;
 
     memset(port, '\0', 10);
     strcpy(port, argv[1]);
 
-    socket_fd = open_listen_port(port, listen_hints, listen_res);
-    address_size = sizeof client_address;
+    port_number = atoi(port);
+    if (port_number <= 1024 || port_number > 65535) {
+        printf("%d is not a valid port number. Must be between 1025 and 65535.\n", port_number);
+    } else {
+        socket_fd = open_listen_port(port, listen_hints, listen_res);
+        address_size = sizeof client_address;
 
-    while(keep_open) {
-        new_fd = accept_client_connection(socket_fd, client_address, address_size, &client_host[0], &client_name[0], &service[0]);
+        while(keep_open) {
+            new_fd = accept_client_connection(socket_fd, client_address, address_size, &client_host[0], &client_name[0], &service[0]);
 
-        cmd = get_command(new_fd, buffer, &command[0], &filename[0], &data_port[0]);
+            cmd = get_command(new_fd, text_buffer, &command[0], &filename[0], &data_port[0]);
 
-        if (cmd == list || cmd == get) {
-            if (cmd == list) {
-                send(new_fd, "OK", 3, 0);
-                printf("List directory requested on port %s\n", data_port);
-                printf("Sending directory contents to %s:%s\n\n", client_name, data_port);
-                data_fd = open_data_port(&client_host[0], &data_port[0], data_hints, data_res);
-                send_list(buffer, data_fd);
-                close(data_fd);
-            } else {
-                printf("File \"%s\" requested on port %s\n", filename, data_port);
-                memset(read_file, '\0', 10000);
-                if(open_file(requested_file, filename, &read_file[0])) {
+            if (cmd == list || cmd == get) {
+                if (cmd == list) {
                     send(new_fd, "OK", 3, 0);
+                    printf("List directory requested on port %s\n", data_port);
+                    printf("Sending directory contents to %s:%s\n\n", client_name, data_port);
                     data_fd = open_data_port(&client_host[0], &data_port[0], data_hints, data_res);
-                    printf("Sending \"%s\" to %s:%s\n\n", filename, client_name, data_port);
-                    send_file(&read_file[0], buffer, data_fd);
+                    send_list(text_buffer, data_fd);
                     close(data_fd);
                 } else {
-                    memset(print_message, '\0', 500);
-                    sprintf(print_message, "File \"%s\" could not be found.\nSending error message to %s:%s\n", filename, client_name, service);
-                    send_error(new_fd, print_message, "FILE NOT FOUND");
+                    printf("File \"%s\" requested on port %s\n", filename, data_port);
+                    stat(filename, &stat_struct);
+                    size_t file_size = stat_struct.st_size;
+                    read_file = (char*) calloc(file_size + 1, sizeof(char));
+                    file_buffer = (char*) calloc(file_size + 11, sizeof(char));
+                    if(open_file(requested_file, filename, &read_file[0], file_size)) {
+                        send(new_fd, "OK", 3, 0);
+                        data_fd = open_data_port(&client_host[0], &data_port[0], data_hints, data_res);
+                        printf("Sending \"%s\" to %s:%s\n\n", filename, client_name, data_port);
+                        send_file(&read_file[0], file_buffer, data_fd, file_size);
+                        close(data_fd);
+                    } else {
+                        memset(print_message, '\0', 500);
+                        sprintf(print_message, "File \"%s\" could not be found.\nSending error message to %s:%s\n", filename, client_name, port);
+                        send_error(new_fd, print_message, "FILE NOT FOUND");
+                    }
                 }
+            } else {
+                memset(print_message, '\0', 500);
+                sprintf(print_message, "Invalid Command.\n%s is not valid input.\nSending error message to %s:%s\n\n", text_buffer, client_name, port);
+                send_error(new_fd, print_message, "INVALID COMMAND");
             }
-        } else {
-            memset(print_message, '\0', 500);
-            sprintf(print_message, "Invalid Command.\n%s is not valid input.\nSending error message to %s:%s\n\n", buffer, client_name, service);
-            send_error(new_fd, print_message, "INVALID COMMAND");
         }
-    }
 
-    close(new_fd);
-    close(socket_fd);
+        close(new_fd);
+        close(socket_fd);
+    }
 }
