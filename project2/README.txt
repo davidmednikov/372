@@ -10,24 +10,23 @@ How to compile:
     2. Navigate to that directory and run 'make' in terminal.
         This should give ftclient.py the execute permission and compile an executable for ftserver.c
 
-How to execute:
+How to run:
     1. On one FLIP server, run this command to start the server, passing in your own port number:
-        ./ftserver [PORTNUM]
+        ./ftserver [SERVER_PORT]
     2. On another FLIP server, run this command to start the client, passing in the following parameters:
         - host and port of the server
-        - command and filename (if necessary)
+        - command and filename (filename only if necessary)
         - data_port for server to send response on
 
-        ./ftclient.py [HOSTNAME] [PORTNUM] [COMMAND] [FILENAME] [DATA_PORT]
+        ./ftclient.py [SERVER_HOST] [SERVER_PORT] [COMMAND] [FILENAME] [DATA_PORT]
 
-How to control:
-    1. The client will ask you to enter your username. Must be 10 characters or less and contain no white space.
-    2. After entering username, the client will query you for a message to send to the server. Limit 500 chars.
-    3. Hit Enter to send the message to the server. The client will pause, waiting for a response from the server.
-    4. On the server side, you should see the message from the client appear as "{username} > {message}".
-    5. The server will query the user for a message to send to the client. Press Enter to send. Max 500 characters.
-    6. The client will display the message as "chatserve > {message}" and query the user for a message to send back.
-    7. Steps 2-6 will repeat until one of the programs enters an input of '\quit' or sends a SIGINT signal.
-    8. If the client enters '\quit' or receives a SIGINT, the client will quit but the server will still listen to the port.
-    9. If the server enters '\quit', it will close the connection with the client and listen for another connection.
-    10. If the server receives a SIGINT, both the server and the client will quit.
+Validation:
+    The program must pass the following validation checks:
+        1. The server_port on ftserver must be in the range 1025 <= server_port <= 65535.
+        2. The server_port on ftclient must be in the range 1025 <= server_port <= 65535.
+        3. The data_port on ftclient must be in the range 1025 <= data_port <= 65535.
+        4. The server_host must be one of "flip", "flip2", or "flip3".
+        5. The command must be one of "-l" or "-g".
+        6. If the command is "-g", there must be a filename argument and 6 total arguments.
+        7. If the command is "-l", there must be no filename argument and 5 total arguments.
+        8. The specified filename must exist on the server or else an error will be returned.
