@@ -285,6 +285,7 @@ def save_file(filename, lines):
     print("Receiving \"{}\" from {}:{}".format(request['file'], request['hostname'], request['data_port']))
 
     # if file does not already exist
+    # excerpted from https://www.geeksforgeeks.org/python-os-path-isfile-method/
     if not os.path.isfile('./' + filename):
         # create the file for writing
         new_file = open(filename, 'w')

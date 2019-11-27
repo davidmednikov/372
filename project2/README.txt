@@ -14,8 +14,8 @@ How to run:
     1. On one FLIP server, run this command to start the server, passing in your own port number:
         ./ftserver [SERVER_PORT]
     2. On another FLIP server, run this command to start the client, passing in the following parameters:
-        - host and port of the server
-        - command and filename (filename only if necessary)
+        - hostname (flip1, flip2, or flip3) and port of the server (as set in step #1)
+        - command (-l or -g) and filename (filename only if necessary)
         - data_port for server to send response on
 
         ./ftclient.py [SERVER_HOST] [SERVER_PORT] [COMMAND] [FILENAME] [DATA_PORT]

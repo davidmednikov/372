@@ -574,6 +574,7 @@ int main(int argc, char* argv[]) {
                 printf("File \"%s\" requested on port %s\n", filename, data_port);
 
                 // get stats about file, then get file size
+                // adapted from https://stackoverflow.com/questions/238603/how-can-i-get-a-files-size-in-c
                 stat(filename, &stat_struct);
                 size_t file_size = stat_struct.st_size;
 
