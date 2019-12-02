@@ -6,7 +6,7 @@
 #
 # Project 2 - File Transfer Client (ftclient)
 # David Mednikov
-# Last Modified: 11/30/2019 3:30pm
+# Last Modified: 11/26/2019 11:30pm
 #
 #   TO-DO: rewrite below
 #
@@ -375,6 +375,14 @@ def print_directory(directory_list, request):
 ####################################################################################
 #
 # MAIN METHOD
+#   ftclient.py - validates runtime commands ('-l' or '-g') and sends it to a server.
+#   Depending on server response, either displays a list or saves a requested file.
+#   Params (Runtime arguments):
+#       server host (flip1, flip2, or flip3)
+#       server port (1025 <= port <= 65535)
+#       command (-l or -g)
+#       filename (only if command == -g)
+#       data port (1025 <= port <= 65535)
 #
 ####################################################################################
 
